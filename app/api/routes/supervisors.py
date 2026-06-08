@@ -3,6 +3,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.db.session import get_db
 from app.schemas.supervisor import SupervisorCreate, SupervisorUpdate, SupervisorResponse
@@ -17,6 +18,14 @@ from app.db.base import supervisor_gateways
 router = APIRouter()
 
 
+def _supervisor_query():
+    return select(Supervisor).options(selectinload(Supervisor.user))
+
+
+def _worker_query():
+    return select(Worker).options(selectinload(Worker.user))
+
+
 @router.get("/", response_model=List[SupervisorResponse])
 async def list_supervisors(
     skip: int = 0,
@@ -24,7 +33,7 @@ async def list_supervisors(
     db: AsyncSession = Depends(get_db),
     _=Depends(get_current_active_user),
 ):
-    result = await db.execute(select(Supervisor).offset(skip).limit(limit))
+    result = await db.execute(_supervisor_query().offset(skip).limit(limit))
     return result.scalars().all()
 
 
@@ -37,8 +46,8 @@ async def add_supervisor(
     supervisor = Supervisor(**data.model_dump())
     db.add(supervisor)
     await db.commit()
-    await db.refresh(supervisor)
-    return supervisor
+    result = await db.execute(_supervisor_query().where(Supervisor.id == supervisor.id))
+    return result.scalar_one()
 
 
 @router.get("/{supervisor_id}", response_model=SupervisorResponse)
@@ -47,7 +56,7 @@ async def read_supervisor(
     db: AsyncSession = Depends(get_db),
     _=Depends(get_current_active_user),
 ):
-    result = await db.execute(select(Supervisor).where(Supervisor.id == supervisor_id))
+    result = await db.execute(_supervisor_query().where(Supervisor.id == supervisor_id))
     supervisor = result.scalar_one_or_none()
     if not supervisor:
         raise HTTPException(status_code=404, detail="Supervisor not found")
@@ -61,15 +70,15 @@ async def edit_supervisor(
     db: AsyncSession = Depends(get_db),
     _=Depends(get_current_active_user),
 ):
-    result = await db.execute(select(Supervisor).where(Supervisor.id == supervisor_id))
+    result = await db.execute(_supervisor_query().where(Supervisor.id == supervisor_id))
     supervisor = result.scalar_one_or_none()
     if not supervisor:
         raise HTTPException(status_code=404, detail="Supervisor not found")
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(supervisor, field, value)
     await db.commit()
-    await db.refresh(supervisor)
-    return supervisor
+    result = await db.execute(_supervisor_query().where(Supervisor.id == supervisor_id))
+    return result.scalar_one()
 
 
 @router.delete("/{supervisor_id}", status_code=204)
@@ -92,7 +101,9 @@ async def supervisor_workers(
     db: AsyncSession = Depends(get_db),
     _=Depends(get_current_active_user),
 ):
-    result = await db.execute(select(Worker).where(Worker.supervisor_id == supervisor_id))
+    result = await db.execute(
+        _worker_query().where(Worker.supervisor_id == supervisor_id)
+    )
     return result.scalars().all()
 
 

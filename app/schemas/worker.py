@@ -2,6 +2,17 @@ import uuid
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
+from app.models.user import UserRole
+
+
+class UserBrief(BaseModel):
+    id: uuid.UUID
+    email: str
+    full_name: str
+    role: UserRole
+    is_active: bool
+    avatar_url: Optional[str] = None
+    model_config = {"from_attributes": True}
 
 
 class WorkerCreate(BaseModel):
@@ -31,6 +42,7 @@ class WorkerResponse(BaseModel):
     is_active: bool
     supervisor_id: Optional[uuid.UUID] = None
     user_id: Optional[uuid.UUID] = None
+    user: Optional[UserBrief] = None
     created_at: datetime
     updated_at: datetime
 

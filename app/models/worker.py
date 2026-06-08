@@ -32,5 +32,6 @@ class Worker(Base):
     supervisor: Mapped["Supervisor"] = relationship(
         "Supervisor", back_populates="workers"
     )
+    user:    Mapped["User"]          = relationship("User")
     helmets: Mapped[list["Helmet"]]  = relationship("Helmet", back_populates="worker")
     alerts: Mapped[list["Alert"]]    = relationship("Alert", back_populates="worker")

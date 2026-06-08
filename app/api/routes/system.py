@@ -6,6 +6,7 @@ from sqlalchemy import text
 from app.db.session import get_db
 from app.core.dependencies import get_current_active_user
 from app.core.config import settings
+from app.models.system_health import SystemHealthLog
 
 router = APIRouter()
 
@@ -27,20 +28,32 @@ async def db_health(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/performance")
-async def performance(_=Depends(get_current_active_user)):
-    mem = psutil.virtual_memory()
+async def performance(
+    db: AsyncSession = Depends(get_db),
+    _=Depends(get_current_active_user),
+):
+    mem  = psutil.virtual_memory()
     disk = psutil.disk_usage(".")
+    cpu  = psutil.cpu_percent(interval=0.1)
+
+    db.add(SystemHealthLog(
+        cpu_percent=cpu,
+        memory_percent=mem.percent,
+        disk_percent=disk.percent,
+    ))
+    await db.commit()
+
     return {
-        "cpu_percent": psutil.cpu_percent(interval=0.1),
+        "cpu_percent": cpu,
         "memory": {
             "total_mb": round(mem.total / 1024 / 1024, 1),
-            "used_mb": round(mem.used / 1024 / 1024, 1),
-            "percent": mem.percent,
+            "used_mb":  round(mem.used  / 1024 / 1024, 1),
+            "percent":  mem.percent,
         },
         "disk": {
             "total_gb": round(disk.total / 1024 / 1024 / 1024, 1),
-            "used_gb": round(disk.used / 1024 / 1024 / 1024, 1),
-            "percent": disk.percent,
+            "used_gb":  round(disk.used  / 1024 / 1024 / 1024, 1),
+            "percent":  disk.percent,
         },
     }
 

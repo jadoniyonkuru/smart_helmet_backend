@@ -1,10 +1,12 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 
 from app.api.routes import (
     auth, helmets, workers, supervisors, gateways,
-    alerts, analytics, reports, system, ws,
+    alerts, analytics, reports, system, ws, notifications,
 )
 from app.core.config import settings
 
@@ -15,6 +17,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title=settings.APP_NAME, version="1.0.0", lifespan=lifespan)
+
+Path("uploads/avatars").mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
@@ -33,7 +38,8 @@ app.include_router(alerts.router,      prefix="/api/v1/alerts",      tags=["aler
 app.include_router(analytics.router,   prefix="/api/v1/analytics",   tags=["analytics"])
 app.include_router(reports.router,     prefix="/api/v1/reports",     tags=["reports"])
 app.include_router(system.router,      prefix="/api/v1/system",      tags=["system"])
-app.include_router(ws.router,          prefix="/ws",                  tags=["websockets"])
+app.include_router(ws.router,           prefix="/ws",                          tags=["websockets"])
+app.include_router(notifications.router, prefix="/api/v1/notifications",       tags=["notifications"])
 
 
 @app.get("/", tags=["root"])
