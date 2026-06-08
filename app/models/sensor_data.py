@@ -35,6 +35,10 @@ class SensorData(Base):
     accelerometer_y: Mapped[float] = mapped_column(Float, nullable=True)
     accelerometer_z: Mapped[float] = mapped_column(Float, nullable=True)
 
+    # Device health
+    battery_level: Mapped[float]   = mapped_column(Float, nullable=True)   # percentage 0–100
+    signal_strength: Mapped[int]   = mapped_column(Integer, nullable=True) # RSSI dBm
+
     recorded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     helmet: Mapped["Helmet"] = relationship("Helmet", back_populates="sensor_data")

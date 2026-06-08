@@ -1,5 +1,6 @@
 import uuid
 from pydantic import BaseModel, EmailStr
+from typing import Optional
 from app.models.user import UserRole
 
 
@@ -27,6 +28,7 @@ class UserResponse(BaseModel):
     role: UserRole
     is_active: bool
     is_verified: bool
+    avatar_url: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -38,3 +40,13 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class UpdateMeRequest(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None

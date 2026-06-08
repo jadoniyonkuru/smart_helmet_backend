@@ -17,6 +17,8 @@ class SensorDataResponse(BaseModel):
     accelerometer_x: Optional[float] = None
     accelerometer_y: Optional[float] = None
     accelerometer_z: Optional[float] = None
+    battery_level: Optional[float] = None
+    signal_strength: Optional[int] = None
     recorded_at: datetime
 
     model_config = {"from_attributes": True}
@@ -34,3 +36,21 @@ class SensorDataCreate(BaseModel):
     accelerometer_x: Optional[float] = None
     accelerometer_y: Optional[float] = None
     accelerometer_z: Optional[float] = None
+    battery_level: Optional[float] = None
+    signal_strength: Optional[int] = None
+
+
+class HelmetReadingCreate(BaseModel):
+    """IoT device payload — camelCase field names from the hardware."""
+    co: Optional[float] = None             # maps to co_ppm
+    ch4: Optional[float] = None            # maps to ch4_percent
+    temperature: Optional[float] = None
+    humidity: Optional[float] = None
+    helmetWear: Optional[bool] = None      # maps to helmet_worn
+    impactDetected: Optional[bool] = None  # maps to vibration_detected
+    battery: Optional[float] = None        # maps to battery_level
+    signalStrength: Optional[int] = None   # maps to signal_strength
+    accelerometerX: Optional[float] = None # maps to accelerometer_x
+    accelerometerY: Optional[float] = None # maps to accelerometer_y
+    accelerometerZ: Optional[float] = None # maps to accelerometer_z
+    gasLevel: Optional[int] = None         # maps to gas_level
