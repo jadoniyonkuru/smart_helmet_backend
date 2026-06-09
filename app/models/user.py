@@ -25,7 +25,15 @@ class User(Base):
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     reset_token: Mapped[str]  = mapped_column(String(255), nullable=True)
     avatar_url: Mapped[str]   = mapped_column(String(500), nullable=True)
+    phone: Mapped[str]        = mapped_column(String(30), nullable=True)
+    location: Mapped[str]     = mapped_column(String(255), nullable=True)
+    department: Mapped[str]   = mapped_column(String(255), nullable=True)
+    bio: Mapped[str]          = mapped_column(String(1000), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
+
+    @property
+    def name(self) -> str:
+        return self.full_name

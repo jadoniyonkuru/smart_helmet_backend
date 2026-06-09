@@ -1,25 +1,72 @@
 from contextlib import asynccontextmanager
+import logging
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pathlib import Path
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
 
 from app.api.routes import (
     auth, helmets, workers, supervisors, gateways,
     alerts, analytics, reports, system, ws, notifications,
 )
 from app.core.config import settings
+from app.core.security import hash_password
+from app.models.user import User, UserRole
+
+logger = logging.getLogger(__name__)
+
+_engine = create_async_engine(settings.DATABASE_URL, echo=False)
+_Session = sessionmaker(
+    _engine, class_=AsyncSession, expire_on_commit=False
+)
+
+
+async def _seed_admin() -> None:
+    async with _Session() as db:
+        result = await db.execute(
+            select(User).where(
+                User.email == settings.FIRST_ADMIN_EMAIL
+            )
+        )
+        if result.scalar_one_or_none():
+            return
+        admin = User(
+            email=settings.FIRST_ADMIN_EMAIL,
+            full_name="System Admin",
+            hashed_password=hash_password(
+                settings.FIRST_ADMIN_PASSWORD
+            ),
+            role=UserRole.admin,
+            is_active=True,
+            is_verified=True,
+        )
+        db.add(admin)
+        await db.commit()
+        logger.info(
+            "Admin user created: %s", settings.FIRST_ADMIN_EMAIL
+        )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await _seed_admin()
     yield
 
 
-app = FastAPI(title=settings.APP_NAME, version="1.0.0", lifespan=lifespan)
+app = FastAPI(
+    title=settings.APP_NAME,
+    version="1.0.0",
+    lifespan=lifespan,
+)
 
 Path("uploads/avatars").mkdir(parents=True, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.mount(
+    "/uploads", StaticFiles(directory="uploads"), name="uploads"
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -29,17 +76,47 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router,        prefix="/api/v1/auth",        tags=["auth"])
-app.include_router(helmets.router,     prefix="/api/v1/helmets",     tags=["helmets"])
-app.include_router(workers.router,     prefix="/api/v1/workers",     tags=["workers"])
-app.include_router(supervisors.router, prefix="/api/v1/supervisors", tags=["supervisors"])
-app.include_router(gateways.router,    prefix="/api/v1/gateways",    tags=["gateways"])
-app.include_router(alerts.router,      prefix="/api/v1/alerts",      tags=["alerts"])
-app.include_router(analytics.router,   prefix="/api/v1/analytics",   tags=["analytics"])
-app.include_router(reports.router,     prefix="/api/v1/reports",     tags=["reports"])
-app.include_router(system.router,      prefix="/api/v1/system",      tags=["system"])
-app.include_router(ws.router,           prefix="/ws",                          tags=["websockets"])
-app.include_router(notifications.router, prefix="/api/v1/notifications",       tags=["notifications"])
+app.include_router(
+    auth.router, prefix="/api/v1/auth", tags=["auth"]
+)
+app.include_router(
+    helmets.router, prefix="/api/v1/helmets", tags=["helmets"]
+)
+app.include_router(
+    workers.router, prefix="/api/v1/workers", tags=["workers"]
+)
+app.include_router(
+    supervisors.router,
+    prefix="/api/v1/supervisors",
+    tags=["supervisors"],
+)
+app.include_router(
+    gateways.router,
+    prefix="/api/v1/gateways",
+    tags=["gateways"],
+)
+app.include_router(
+    alerts.router, prefix="/api/v1/alerts", tags=["alerts"]
+)
+app.include_router(
+    analytics.router,
+    prefix="/api/v1/analytics",
+    tags=["analytics"],
+)
+app.include_router(
+    reports.router, prefix="/api/v1/reports", tags=["reports"]
+)
+app.include_router(
+    system.router, prefix="/api/v1/system", tags=["system"]
+)
+app.include_router(
+    ws.router, prefix="/ws", tags=["websockets"]
+)
+app.include_router(
+    notifications.router,
+    prefix="/api/v1/notifications",
+    tags=["notifications"],
+)
 
 
 @app.get("/", tags=["root"])

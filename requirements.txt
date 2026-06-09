@@ -33,6 +33,7 @@ defusedxml==0.7.1
 ecdsa==0.19.2
 executing==2.2.0
 fastapi==0.136.1
+fastapi-mail==1.4.2
 fastjsonschema==2.21.1
 fonttools==4.56.0
 fqdn==1.5.1
@@ -101,6 +102,7 @@ psycopg2-binary==2.9.12
 pure_eval==0.2.3
 pyasn1==0.6.3
 pycparser==2.22
+email-validator==2.2.0
 pydantic==2.13.3
 pydantic-settings==2.14.1
 pydantic_core==2.46.3

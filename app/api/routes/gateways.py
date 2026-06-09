@@ -3,6 +3,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 
 from app.db.session import get_db
 from app.schemas.gateway import GatewayCreate, GatewayUpdate, GatewayResponse
@@ -14,6 +15,10 @@ from app.models.helmet import Helmet
 router = APIRouter()
 
 
+def _gateway_query():
+    return select(Gateway).options(selectinload(Gateway.helmets))
+
+
 @router.get("/", response_model=List[GatewayResponse])
 async def list_gateways(
     skip: int = 0,
@@ -21,7 +26,7 @@ async def list_gateways(
     db: AsyncSession = Depends(get_db),
     _=Depends(get_current_active_user),
 ):
-    result = await db.execute(select(Gateway).offset(skip).limit(limit))
+    result = await db.execute(_gateway_query().offset(skip).limit(limit))
     return result.scalars().all()
 
 
@@ -31,11 +36,14 @@ async def add_gateway(
     db: AsyncSession = Depends(get_db),
     _=Depends(get_current_active_user),
 ):
-    gateway = Gateway(**data.model_dump())
+    gateway_data = data.model_dump(exclude={'status'})
+    if data.status is not None:
+        gateway_data['is_online'] = data.status == 'online'
+    gateway = Gateway(**gateway_data)
     db.add(gateway)
     await db.commit()
-    await db.refresh(gateway)
-    return gateway
+    result = await db.execute(_gateway_query().where(Gateway.id == gateway.id))
+    return result.scalar_one()
 
 
 @router.get("/{gateway_id}", response_model=GatewayResponse)
@@ -44,7 +52,7 @@ async def read_gateway(
     db: AsyncSession = Depends(get_db),
     _=Depends(get_current_active_user),
 ):
-    result = await db.execute(select(Gateway).where(Gateway.id == gateway_id))
+    result = await db.execute(_gateway_query().where(Gateway.id == gateway_id))
     gateway = result.scalar_one_or_none()
     if not gateway:
         raise HTTPException(status_code=404, detail="Gateway not found")
@@ -58,15 +66,18 @@ async def edit_gateway(
     db: AsyncSession = Depends(get_db),
     _=Depends(get_current_active_user),
 ):
-    result = await db.execute(select(Gateway).where(Gateway.id == gateway_id))
+    result = await db.execute(_gateway_query().where(Gateway.id == gateway_id))
     gateway = result.scalar_one_or_none()
     if not gateway:
         raise HTTPException(status_code=404, detail="Gateway not found")
-    for field, value in data.model_dump(exclude_unset=True).items():
+    update_data = data.model_dump(exclude_unset=True, exclude={'status'})
+    if data.status is not None:
+        update_data['is_online'] = data.status == 'online'
+    for field, value in update_data.items():
         setattr(gateway, field, value)
     await db.commit()
-    await db.refresh(gateway)
-    return gateway
+    result = await db.execute(_gateway_query().where(Gateway.id == gateway_id))
+    return result.scalar_one()
 
 
 @router.delete("/{gateway_id}", status_code=204)
@@ -89,22 +100,20 @@ async def gateway_status(
     db: AsyncSession = Depends(get_db),
     _=Depends(get_current_active_user),
 ):
-    result = await db.execute(select(Gateway).where(Gateway.id == gateway_id))
+    result = await db.execute(_gateway_query().where(Gateway.id == gateway_id))
     gateway = result.scalar_one_or_none()
     if not gateway:
         raise HTTPException(status_code=404, detail="Gateway not found")
-    helmet_count = (
-        await db.execute(select(func.count()).select_from(Helmet).where(Helmet.gateway_id == gateway_id))
-    ).scalar()
     return {
         "id": str(gateway.id),
         "name": gateway.name,
         "is_online": gateway.is_online,
+        "status": gateway.status,
         "location": gateway.location,
         "ip_address": gateway.ip_address,
         "last_seen": gateway.last_seen,
         "packet_delivery_rate": gateway.packet_delivery_rate,
-        "connected_helmets": helmet_count,
+        "connected_helmets": gateway.connected_helmets,
     }
 
 

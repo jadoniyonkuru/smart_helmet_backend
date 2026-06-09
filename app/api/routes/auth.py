@@ -70,8 +70,9 @@ async def update_me(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if data.full_name is not None:
-        current_user.full_name = data.full_name
+    update_name = data.full_name or data.name
+    if update_name is not None:
+        current_user.full_name = update_name
     if data.email is not None:
         existing = (await db.execute(
             select(User).where(User.email == data.email, User.id != current_user.id)
@@ -79,6 +80,14 @@ async def update_me(
         if existing:
             raise HTTPException(status_code=400, detail="Email already in use")
         current_user.email = data.email
+    if data.phone is not None:
+        current_user.phone = data.phone
+    if data.location is not None:
+        current_user.location = data.location
+    if data.department is not None:
+        current_user.department = data.department
+    if data.bio is not None:
+        current_user.bio = data.bio
     await db.commit()
     await db.refresh(current_user)
     return current_user

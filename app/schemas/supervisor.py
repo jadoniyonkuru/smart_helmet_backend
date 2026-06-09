@@ -1,5 +1,5 @@
 import uuid
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from typing import Optional
 from datetime import datetime
 from app.models.user import UserRole
@@ -17,9 +17,9 @@ class UserBrief(BaseModel):
 
 class SupervisorCreate(BaseModel):
     full_name: str
-    employee_id: str
+    email: EmailStr
     phone: Optional[str] = None
-    user_id: Optional[uuid.UUID] = None
+    employee_id: Optional[str] = None
 
 
 class SupervisorUpdate(BaseModel):
@@ -31,6 +31,7 @@ class SupervisorUpdate(BaseModel):
 class SupervisorResponse(BaseModel):
     id: uuid.UUID
     full_name: str
+    name: Optional[str] = None
     employee_id: str
     phone: Optional[str] = None
     is_active: bool
@@ -38,5 +39,12 @@ class SupervisorResponse(BaseModel):
     user: Optional[UserBrief] = None
     created_at: datetime
     updated_at: datetime
+
+    # Derived from model properties (populated via selectinload)
+    email: Optional[str] = None
+    status: Optional[str] = None
+    worker_count: Optional[int] = 0
+    gateway_count: Optional[int] = 0
+    last_active: Optional[datetime] = None
 
     model_config = {"from_attributes": True}

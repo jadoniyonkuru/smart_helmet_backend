@@ -1,5 +1,5 @@
 import uuid
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, model_validator
 from typing import Optional
 from app.models.user import UserRole
 
@@ -25,12 +25,23 @@ class UserResponse(BaseModel):
     id: uuid.UUID
     email: str
     full_name: str
+    name: Optional[str] = None
     role: UserRole
     is_active: bool
     is_verified: bool
     avatar_url: Optional[str] = None
+    phone: Optional[str] = None
+    location: Optional[str] = None
+    department: Optional[str] = None
+    bio: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+    @model_validator(mode='after')
+    def _set_name(self):
+        if not self.name:
+            self.name = self.full_name
+        return self
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -48,5 +59,10 @@ class ChangePasswordRequest(BaseModel):
 
 
 class UpdateMeRequest(BaseModel):
+    name: Optional[str] = None
     full_name: Optional[str] = None
     email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    location: Optional[str] = None
+    department: Optional[str] = None
+    bio: Optional[str] = None

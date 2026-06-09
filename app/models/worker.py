@@ -1,9 +1,11 @@
 import uuid
 from datetime import datetime
+from typing import Optional
 from sqlalchemy import String, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from app.db.base import Base
+
 
 class Worker(Base):
     __tablename__ = "workers"
@@ -35,3 +37,19 @@ class Worker(Base):
     user:    Mapped["User"]          = relationship("User")
     helmets: Mapped[list["Helmet"]]  = relationship("Helmet", back_populates="worker")
     alerts: Mapped[list["Alert"]]    = relationship("Alert", back_populates="worker")
+
+    @property
+    def name(self) -> str:
+        return self.full_name
+
+    @property
+    def email(self) -> Optional[str]:
+        return self.user.email if self.user else None
+
+    @property
+    def status(self) -> str:
+        return 'active' if self.is_active else 'inactive'
+
+    @property
+    def department(self) -> Optional[str]:
+        return self.zone

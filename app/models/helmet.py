@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Optional
 from sqlalchemy import String, Boolean, DateTime, ForeignKey, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
@@ -45,3 +46,7 @@ class Helmet(Base):
         "SensorData", back_populates="helmet"
     )
     alerts: Mapped[list["Alert"]]    = relationship("Alert", back_populates="helmet")
+
+    @property
+    def worker_name(self) -> Optional[str]:
+        return self.worker.full_name if self.worker else None

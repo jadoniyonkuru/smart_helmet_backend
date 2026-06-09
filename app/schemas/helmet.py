@@ -10,6 +10,7 @@ class HelmetCreate(BaseModel):
     zone: Optional[str] = None
     firmware_version: Optional[str] = None
     gateway_id: Optional[uuid.UUID] = None
+    worker_id: Optional[uuid.UUID] = None
 
 
 class HelmetUpdate(BaseModel):
@@ -33,5 +34,8 @@ class HelmetResponse(BaseModel):
     worker_id: Optional[uuid.UUID] = None
     created_at: datetime
     updated_at: datetime
+
+    # Derived from relationships
+    worker_name: Optional[str] = None
 
     model_config = {"from_attributes": True}

@@ -36,14 +36,20 @@ class WorkerUpdate(BaseModel):
 class WorkerResponse(BaseModel):
     id: uuid.UUID
     full_name: str
+    name: Optional[str] = None
     employee_id: str
     phone: Optional[str] = None
     zone: Optional[str] = None
+    department: Optional[str] = None
     is_active: bool
     supervisor_id: Optional[uuid.UUID] = None
     user_id: Optional[uuid.UUID] = None
     user: Optional[UserBrief] = None
     created_at: datetime
     updated_at: datetime
+
+    # Derived from model properties
+    email: Optional[str] = None
+    status: Optional[str] = None
 
     model_config = {"from_attributes": True}
