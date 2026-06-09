@@ -25,6 +25,9 @@ class Worker(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
+    department_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("departments.id", ondelete="SET NULL"), nullable=True
+    )
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
@@ -34,9 +37,16 @@ class Worker(Base):
     supervisor: Mapped["Supervisor"] = relationship(
         "Supervisor", back_populates="workers"
     )
-    user:    Mapped["User"]          = relationship("User")
-    helmets: Mapped[list["Helmet"]]  = relationship("Helmet", back_populates="worker")
-    alerts: Mapped[list["Alert"]]    = relationship("Alert", back_populates="worker")
+    user: Mapped["User"] = relationship("User")
+    helmets: Mapped[list["Helmet"]] = relationship(
+        "Helmet", back_populates="worker"
+    )
+    alerts: Mapped[list["Alert"]] = relationship(
+        "Alert", back_populates="worker"
+    )
+    dept: Mapped[Optional["Department"]] = relationship(
+        "Department", back_populates="workers"
+    )
 
     @property
     def name(self) -> str:
@@ -52,4 +62,6 @@ class Worker(Base):
 
     @property
     def department(self) -> Optional[str]:
+        if self.dept is not None:
+            return self.dept.name
         return self.zone

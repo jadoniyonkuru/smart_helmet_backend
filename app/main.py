@@ -12,6 +12,7 @@ from sqlalchemy.orm import sessionmaker
 from app.api.routes import (
     auth, helmets, workers, supervisors, gateways,
     alerts, analytics, reports, system, ws, notifications,
+    departments,
 )
 from app.core.config import settings
 from app.core.security import hash_password
@@ -116,6 +117,11 @@ app.include_router(
     notifications.router,
     prefix="/api/v1/notifications",
     tags=["notifications"],
+)
+app.include_router(
+    departments.router,
+    prefix="/api/v1/departments",
+    tags=["departments"],
 )
 
 

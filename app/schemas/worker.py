@@ -22,6 +22,7 @@ class WorkerCreate(BaseModel):
     zone: Optional[str] = None
     supervisor_id: Optional[uuid.UUID] = None
     user_id: Optional[uuid.UUID] = None
+    department_id: Optional[uuid.UUID] = None
 
 
 class WorkerUpdate(BaseModel):
@@ -31,6 +32,7 @@ class WorkerUpdate(BaseModel):
     is_active: Optional[bool] = None
     supervisor_id: Optional[uuid.UUID] = None
     user_id: Optional[uuid.UUID] = None
+    department_id: Optional[uuid.UUID] = None
 
 
 class WorkerResponse(BaseModel):
@@ -41,6 +43,7 @@ class WorkerResponse(BaseModel):
     phone: Optional[str] = None
     zone: Optional[str] = None
     department: Optional[str] = None
+    department_id: Optional[uuid.UUID] = None
     is_active: bool
     supervisor_id: Optional[uuid.UUID] = None
     user_id: Optional[uuid.UUID] = None
