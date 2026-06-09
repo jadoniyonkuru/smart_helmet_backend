@@ -23,8 +23,8 @@ class DepartmentResponse(BaseModel):
     description: Optional[str] = None
     location: Optional[str] = None
     is_active: bool
-    worker_count: Optional[int] = 0
-    status: Optional[str] = None
+    worker_count: int = 0
+    status: str = "active"
     created_at: datetime
     updated_at: datetime
 
