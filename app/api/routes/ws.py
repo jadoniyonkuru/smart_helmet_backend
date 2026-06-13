@@ -27,21 +27,37 @@ async def helmet_ws(websocket: WebSocket, helmet_id: uuid.UUID):
                 )
                 data = result.scalar_one_or_none()
             if data:
-                await websocket.send_json({
-                    "helmet_id": str(helmet_id),
-                    "temperature": data.temperature,
-                    "humidity": data.humidity,
-                    "gas_level": data.gas_level,
-                    "co_ppm": data.co_ppm,
-                    "vibration_detected": data.vibration_detected,
-                    "helmet_worn": data.helmet_worn,
-                    "accelerometer_x": data.accelerometer_x,
-                    "accelerometer_y": data.accelerometer_y,
-                    "accelerometer_z": data.accelerometer_z,
-                    "recorded_at": data.recorded_at.isoformat(),
-                })
+                await websocket.send_json(
+                    {
+                        "helmet_id": str(helmet_id),
+                        "temperature": data.temperature,
+                        "humidity": data.humidity,
+                        "gas_level": data.gas_level,
+                        "co_ppm": data.co_ppm,
+                        "vibration_detected": data.vibration_detected,
+                        "helmet_worn": data.helmet_worn,
+                        "accelerometer_x": data.accelerometer_x,
+                        "accelerometer_y": data.accelerometer_y,
+                        "accelerometer_z": data.accelerometer_z,
+                        "step_count": data.step_count,
+                        "heading_deg": data.heading_deg,
+                        "est_zone": data.est_zone,
+                        "ai_prediction": data.ai_prediction,
+                        "ai_confidence": data.ai_confidence,
+                        "ai_danger_votes": data.ai_danger_votes,
+                        "ai_model_votes": {
+                            "isolation_forest": data.ai_if_vote,
+                            "random_forest": data.ai_rf_vote,
+                            "lstm": data.ai_lstm_vote,
+                            "svm": data.ai_svm_vote,
+                        },
+                        "recorded_at": data.recorded_at.isoformat(),
+                    }
+                )
             else:
-                await websocket.send_json({"helmet_id": str(helmet_id), "message": "No sensor data yet"})
+                await websocket.send_json(
+                    {"helmet_id": str(helmet_id), "message": "No sensor data yet"}
+                )
             await asyncio.sleep(5)
     except WebSocketDisconnect:
         manager.disconnect(websocket, room)
@@ -60,21 +76,23 @@ async def alerts_ws(websocket: WebSocket):
                     .limit(10)
                 )
                 alerts = result.scalars().all()
-            await websocket.send_json({
-                "type": "unresolved_alerts",
-                "count": len(alerts),
-                "alerts": [
-                    {
-                        "id": str(a.id),
-                        "level": a.level.value,
-                        "type": a.type.value,
-                        "message": a.message,
-                        "helmet_id": str(a.helmet_id) if a.helmet_id else None,
-                        "created_at": a.created_at.isoformat(),
-                    }
-                    for a in alerts
-                ],
-            })
+            await websocket.send_json(
+                {
+                    "type": "unresolved_alerts",
+                    "count": len(alerts),
+                    "alerts": [
+                        {
+                            "id": str(a.id),
+                            "level": a.level.value,
+                            "type": a.type.value,
+                            "message": a.message,
+                            "helmet_id": str(a.helmet_id) if a.helmet_id else None,
+                            "created_at": a.created_at.isoformat(),
+                        }
+                        for a in alerts
+                    ],
+                }
+            )
             await asyncio.sleep(5)
     except WebSocketDisconnect:
         manager.disconnect(websocket, "alerts")
@@ -88,21 +106,25 @@ async def gateways_ws(websocket: WebSocket):
             async with AsyncSessionLocal() as db:
                 result = await db.execute(select(Gateway))
                 gateways = result.scalars().all()
-            await websocket.send_json({
-                "type": "gateway_status",
-                "gateways": [
-                    {
-                        "id": str(g.id),
-                        "name": g.name,
-                        "is_online": g.is_online,
-                        "location": g.location,
-                        "ip_address": g.ip_address,
-                        "packet_delivery_rate": g.packet_delivery_rate,
-                        "last_seen": g.last_seen.isoformat() if g.last_seen else None,
-                    }
-                    for g in gateways
-                ],
-            })
+            await websocket.send_json(
+                {
+                    "type": "gateway_status",
+                    "gateways": [
+                        {
+                            "id": str(g.id),
+                            "name": g.name,
+                            "is_online": g.is_online,
+                            "location": g.location,
+                            "ip_address": g.ip_address,
+                            "packet_delivery_rate": g.packet_delivery_rate,
+                            "last_seen": g.last_seen.isoformat()
+                            if g.last_seen
+                            else None,
+                        }
+                        for g in gateways
+                    ],
+                }
+            )
             await asyncio.sleep(10)
     except WebSocketDisconnect:
         manager.disconnect(websocket, "gateways")
