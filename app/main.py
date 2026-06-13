@@ -21,6 +21,7 @@ from app.api.routes import (
     system,
     ws,
     notifications,
+    departments,
 )
 from app.core.config import settings
 from app.core.security import hash_password
@@ -114,6 +115,7 @@ app.include_router(
     prefix="/api/v1/notifications",
     tags=["notifications"],
 )
+app.include_router(departments.router, prefix="/api/v1/departments", tags=["departments"])
 
 
 @app.get("/", tags=["root"])
