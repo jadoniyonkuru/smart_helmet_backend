@@ -87,7 +87,7 @@ def transform_to_backend(fw: dict) -> dict:
     return {
         "co": fw.get("co_ppm", 0),
         "ch4": fw.get("ch4_pct", 0),
-        "gasLevel": fw.get("co_ppm", 0),
+        "gasLevel": int(fw.get("co_ppm", 0) or 0),
         "temperature": fw.get("temperature_c", 0),
         "humidity": fw.get("humidity_pct", 0),
         "helmetWear": fw.get("helmet_worn", True),
@@ -143,7 +143,7 @@ def main():
                     f"{API_BASE}/api/v1/helmets/{helmet_id}/readings",
                     json=payload,
                     headers=headers,
-                    timeout=5,
+                    timeout=15,
                 )
                 if r.status_code == 201 or r.status_code == 200:
                     co = fw_data.get("co_ppm", 0)
@@ -162,6 +162,8 @@ def main():
                 pass
             except requests.ConnectionError:
                 print("  [ERR] Backend unreachable")
+            except requests.Timeout:
+                print("  [WARN] Request timed out — backend busy, skipping packet")
     except KeyboardInterrupt:
         print("Stopped by user")
     finally:
