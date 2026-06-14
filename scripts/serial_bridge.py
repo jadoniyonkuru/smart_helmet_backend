@@ -48,6 +48,41 @@ def load_helmet_map(headers: dict) -> dict:
     return {}
 
 
+def parse_text_line(line: str) -> dict:
+    """
+    Parse plain-text firmware lines like:
+    'Vib:NO IR:262143 Steps:26'
+    into a dict compatible with transform_to_backend.
+    """
+    data = {}
+    parts = line.split()
+    for part in parts:
+        if ":" not in part:
+            continue
+        key, _, val = part.partition(":")
+        key = key.strip().upper()
+        val = val.strip()
+        if key == "VIB":      data["vibration"]     = val.upper() == "YES"
+        elif key == "IR":     data["ir_value"]       = int(val) if val.isdigit() else 0
+        elif key == "STEPS":  data["step_count"]     = int(val) if val.isdigit() else 0
+        elif key == "CO":     data["co_ppm"]         = float(val)
+        elif key == "CH4":    data["ch4_pct"]        = float(val)
+        elif key == "TEMP":   data["temperature_c"]  = float(val)
+        elif key == "HUM":    data["humidity_pct"]   = float(val)
+        elif key == "AX":     data["accel_x"]        = float(val)
+        elif key == "AY":     data["accel_y"]        = float(val)
+        elif key == "AZ":     data["accel_z"]        = float(val)
+        elif key == "GX":     data["gyro_x"]         = float(val)
+        elif key == "GY":     data["gyro_y"]         = float(val)
+        elif key == "GZ":     data["gyro_z"]         = float(val)
+        elif key == "WORN":   data["helmet_worn"]    = val.upper() == "YES"
+        elif key == "HEADING":data["heading_deg"]    = float(val)
+        elif key == "RSSI":   data["rssi"]           = int(val)
+        elif key == "ZONE":   data["est_zone"]       = val
+    data.setdefault("helmet_id", 1)
+    return data
+
+
 def transform_to_backend(fw: dict) -> dict:
     return {
         "co": fw.get("co_ppm", 0),
@@ -95,8 +130,14 @@ def main():
             try:
                 fw_data = json.loads(line)
                 fw_hid = fw_data.get("helmet_id", 1)
-                # firmware may send numeric helmet code; map to UUID when possible
-                helmet_id = helmet_map.get(str(fw_hid)) or helmet_map.get(fw_hid) or fw_hid
+                # map firmware numeric code to UUID; fallback to env var or first helmet
+                helmet_id = (
+                    helmet_map.get(str(fw_hid))
+                    or helmet_map.get(fw_hid)
+                    or os.getenv("HELMET_UUID")
+                    or (next(iter(helmet_map.values()), None))
+                    or fw_hid
+                )
                 payload = transform_to_backend(fw_data)
                 r = requests.post(
                     f"{API_BASE}/api/v1/helmets/{helmet_id}/readings",

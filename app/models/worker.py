@@ -47,7 +47,6 @@ class Worker(Base):
     dept: Mapped[Optional["Department"]] = relationship(
         "Department", back_populates="workers"
     )
-
     @property
     def name(self) -> str:
         return self.full_name
