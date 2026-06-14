@@ -12,7 +12,7 @@ from app.schemas.auth import (
 from app.services.auth_service import (
     authenticate_user, register_user, forgot_password, reset_password,
 )
-from app.core.dependencies import get_current_active_user
+from app.core.dependencies import get_current_active_user, require_admin
 from app.core.security import verify_password, hash_password
 from app.models.user import User
 
@@ -20,7 +20,11 @@ router = APIRouter()
 
 
 @router.post("/register", response_model=UserResponse, status_code=201)
-async def register(data: UserCreate, db: AsyncSession = Depends(get_db)):
+async def register(
+    data: UserCreate,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_admin),
+):
     return await register_user(db, data)
 
 
