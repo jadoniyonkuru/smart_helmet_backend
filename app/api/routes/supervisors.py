@@ -1,24 +1,20 @@
 import uuid
 import secrets
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.db.session import get_db
-from app.schemas.supervisor import (
-    SupervisorCreate, SupervisorUpdate, SupervisorResponse,
-)
+from app.schemas.supervisor import SupervisorCreate, SupervisorUpdate, SupervisorResponse
 from app.schemas.worker import WorkerResponse
-from app.schemas.gateway import GatewayResponse
-from app.core.dependencies import get_current_active_user
+from app.core.dependencies import get_current_active_user, require_admin
 from app.core.security import hash_password
 from app.models.supervisor import Supervisor
 from app.models.user import User, UserRole
 from app.models.worker import Worker
-from app.models.gateway import Gateway
-from app.db.base import supervisor_gateways
+from app.services.email_service import send_welcome_email
 
 router = APIRouter()
 
@@ -27,7 +23,6 @@ def _supervisor_query():
     return select(Supervisor).options(
         selectinload(Supervisor.user),
         selectinload(Supervisor.workers),
-        selectinload(Supervisor.gateways),
     )
 
 
@@ -39,10 +34,14 @@ def _worker_query():
 async def list_supervisors(
     skip: int = 0,
     limit: int = 100,
+    is_active: Optional[bool] = None,
     db: AsyncSession = Depends(get_db),
     _=Depends(get_current_active_user),
 ):
-    result = await db.execute(_supervisor_query().offset(skip).limit(limit))
+    q = _supervisor_query()
+    if is_active is not None:
+        q = q.where(Supervisor.is_active == is_active)
+    result = await db.execute(q.offset(skip).limit(limit))
     return result.scalars().all()
 
 
@@ -50,15 +49,14 @@ async def list_supervisors(
 async def add_supervisor(
     data: SupervisorCreate,
     db: AsyncSession = Depends(get_db),
-    _=Depends(get_current_active_user),
+    _=Depends(require_admin),
 ):
-    # Check if a user with this email already exists
     existing_user = (await db.execute(
         select(User).where(User.email == data.email)
     )).scalar_one_or_none()
 
+    reset_token = None
     if existing_user:
-        # Reuse the existing user account
         user = existing_user
         if user.role != UserRole.supervisor:
             raise HTTPException(
@@ -66,8 +64,8 @@ async def add_supervisor(
                 detail="A user with this email already exists with a different role.",
             )
     else:
-        # Create a new User account for the supervisor
         temp_password = secrets.token_urlsafe(12)
+        reset_token = secrets.token_urlsafe(32)
         user = User(
             email=data.email,
             full_name=data.full_name,
@@ -75,14 +73,12 @@ async def add_supervisor(
             role=UserRole.supervisor,
             is_active=True,
             is_verified=True,
+            reset_token=reset_token,
         )
         db.add(user)
-        await db.flush()  # get user.id without committing
+        await db.flush()
 
-    # Auto-generate employee_id if not provided
     employee_id = data.employee_id or f"SUP-{uuid.uuid4().hex[:8].upper()}"
-
-    # Ensure employee_id is unique
     existing_emp = (await db.execute(
         select(Supervisor).where(Supervisor.employee_id == employee_id)
     )).scalar_one_or_none()
@@ -97,6 +93,17 @@ async def add_supervisor(
     )
     db.add(supervisor)
     await db.commit()
+
+    # Send welcome email so the new supervisor can set their password
+    if reset_token:
+        try:
+            await send_welcome_email(
+                recipient=data.email,
+                full_name=data.full_name,
+                reset_token=reset_token,
+            )
+        except Exception:
+            pass  # Don't fail the request if email delivery fails
 
     result = await db.execute(
         _supervisor_query().where(Supervisor.id == supervisor.id)
@@ -124,7 +131,7 @@ async def edit_supervisor(
     supervisor_id: uuid.UUID,
     data: SupervisorUpdate,
     db: AsyncSession = Depends(get_db),
-    _=Depends(get_current_active_user),
+    _=Depends(require_admin),
 ):
     result = await db.execute(
         _supervisor_query().where(Supervisor.id == supervisor_id)
@@ -145,7 +152,7 @@ async def edit_supervisor(
 async def remove_supervisor(
     supervisor_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _=Depends(get_current_active_user),
+    _=Depends(require_admin),
 ):
     result = await db.execute(
         select(Supervisor).where(Supervisor.id == supervisor_id)
@@ -160,24 +167,12 @@ async def remove_supervisor(
 @router.get("/{supervisor_id}/workers", response_model=List[WorkerResponse])
 async def supervisor_workers(
     supervisor_id: uuid.UUID,
+    is_active: Optional[bool] = None,
     db: AsyncSession = Depends(get_db),
     _=Depends(get_current_active_user),
 ):
-    result = await db.execute(
-        _worker_query().where(Worker.supervisor_id == supervisor_id)
-    )
-    return result.scalars().all()
-
-
-@router.get("/{supervisor_id}/gateways", response_model=List[GatewayResponse])
-async def supervisor_gateways_route(
-    supervisor_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    _=Depends(get_current_active_user),
-):
-    result = await db.execute(
-        select(Gateway)
-        .join(supervisor_gateways, Gateway.id == supervisor_gateways.c.gateway_id)
-        .where(supervisor_gateways.c.supervisor_id == supervisor_id)
-    )
+    q = _worker_query().where(Worker.supervisor_id == supervisor_id)
+    if is_active is not None:
+        q = q.where(Worker.is_active == is_active)
+    result = await db.execute(q)
     return result.scalars().all()

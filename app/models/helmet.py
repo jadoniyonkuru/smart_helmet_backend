@@ -43,9 +43,11 @@ class Helmet(Base):
     gateway: Mapped["Gateway"]       = relationship("Gateway", back_populates="helmets")
     worker: Mapped["Worker"]         = relationship("Worker", back_populates="helmets")
     sensor_data: Mapped[list["SensorData"]] = relationship(
-        "SensorData", back_populates="helmet"
+        "SensorData", back_populates="helmet", cascade="all, delete-orphan"
     )
-    alerts: Mapped[list["Alert"]]    = relationship("Alert", back_populates="helmet")
+    alerts: Mapped[list["Alert"]] = relationship(
+        "Alert", back_populates="helmet", cascade="all, delete-orphan"
+    )
 
     @property
     def worker_name(self) -> Optional[str]:

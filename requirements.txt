@@ -12,3 +12,5 @@ redis
 python-dotenv
 psycopg2-binary
 fastapi-mail
+scikit-learn==1.6.1
+reportlab

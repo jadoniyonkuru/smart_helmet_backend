@@ -14,7 +14,6 @@ from app.api.routes import (
     helmets,
     workers,
     supervisors,
-    gateways,
     alerts,
     analytics,
     reports,
@@ -95,11 +94,6 @@ app.include_router(
     supervisors.router,
     prefix="/api/v1/supervisors",
     tags=["supervisors"],
-)
-app.include_router(
-    gateways.router,
-    prefix="/api/v1/gateways",
-    tags=["gateways"],
 )
 app.include_router(alerts.router, prefix="/api/v1/alerts", tags=["alerts"])
 app.include_router(

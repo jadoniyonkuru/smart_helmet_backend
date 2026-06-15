@@ -48,6 +48,13 @@ async def update_helmet(db: AsyncSession, helmet_id: uuid.UUID, data: HelmetUpda
 
 
 async def delete_helmet(db: AsyncSession, helmet_id: uuid.UUID) -> None:
-    helmet = await get_helmet(db, helmet_id)
+    result = await db.execute(
+        select(Helmet)
+        .options(selectinload(Helmet.sensor_data), selectinload(Helmet.alerts))
+        .where(Helmet.id == helmet_id)
+    )
+    helmet = result.scalar_one_or_none()
+    if not helmet:
+        raise HTTPException(status_code=404, detail="Helmet not found")
     await db.delete(helmet)
     await db.commit()

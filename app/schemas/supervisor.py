@@ -44,7 +44,6 @@ class SupervisorResponse(BaseModel):
     email: Optional[str] = None
     status: Optional[str] = None
     worker_count: Optional[int] = 0
-    gateway_count: Optional[int] = 0
     last_active: Optional[datetime] = None
 
     model_config = {"from_attributes": True}

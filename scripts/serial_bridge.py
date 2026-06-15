@@ -83,6 +83,15 @@ def parse_text_line(line: str) -> dict:
     return data
 
 
+def _get_vibration(fw: dict) -> bool:
+    """Check all common field names the ESP32 firmware might use for vibration."""
+    for key in ("vibration", "vibration_detected", "impactDetected", "impact", "vib", "impact_detected"):
+        val = fw.get(key)
+        if val is not None:
+            return bool(val)
+    return False
+
+
 def transform_to_backend(fw: dict) -> dict:
     return {
         "co": fw.get("co_ppm", 0),
@@ -91,7 +100,7 @@ def transform_to_backend(fw: dict) -> dict:
         "temperature": fw.get("temperature_c", 0),
         "humidity": fw.get("humidity_pct", 0),
         "helmetWear": fw.get("helmet_worn", True),
-        "impactDetected": fw.get("vibration", False),
+        "impactDetected": _get_vibration(fw),
         "accelerometerX": fw.get("accel_x", 0),
         "accelerometerY": fw.get("accel_y", 0),
         "accelerometerZ": fw.get("accel_z", 0),
@@ -104,6 +113,12 @@ def transform_to_backend(fw: dict) -> dict:
         "stepCount": fw.get("step_count", 0),
         "headingDeg": fw.get("heading_deg", 0),
         "estZone": fw.get("est_zone", "Unknown"),
+        # Hardware-reported alert flags (informational — backend also generates its own)
+        "alertGas": fw.get("alert_gas", False),
+        "alertTemp": fw.get("alert_temp", False),
+        "alertFall": fw.get("alert_fall", False),
+        "alertHelmet": fw.get("alert_helmet", False),
+        "alertVibration": fw.get("alert_vibration", False),
     }
 
 
@@ -146,10 +161,16 @@ def main():
                     timeout=15,
                 )
                 if r.status_code == 201 or r.status_code == 200:
-                    co = fw_data.get("co_ppm", 0)
-                    temp = fw_data.get("temperature_c", 0)
-                    helmet = "ON" if fw_data.get("helmet_worn") else "OFF"
-                    print(f"OK | CO:{co:>5.1f} T:{temp:>4.1f} Helmet:{helmet}")
+                    co    = fw_data.get("co_ppm", 0)
+                    temp  = fw_data.get("temperature_c", 0)
+                    hum   = fw_data.get("humidity_pct", 0)
+                    helmet = "ON"  if fw_data.get("helmet_worn") else "OFF"
+                    vib    = _get_vibration(fw_data)
+                    zone   = fw_data.get("est_zone", "")
+                    vib_str = "YES" if vib else "NO"
+                    print(f"OK | CO:{co:>5.1f} T:{temp:>4.1f} H:{hum:>4.1f}% Helmet:{helmet} Vib:{vib_str} Zone:{zone}")
+                    if vib:
+                        print(f"  [!] Impact/vibration detected")
                 elif r.status_code == 401:
                     print("  [AUTH] Token expired, re-authenticating...")
                     token = authenticate()

@@ -6,9 +6,10 @@ from sqlalchemy import select, func
 from app.db.session import get_db
 from app.core.dependencies import get_current_active_user
 from app.models.alert import Alert, AlertType
+from app.models.gateway import Gateway
 from app.models.helmet import Helmet
 from app.models.worker import Worker
-from app.models.gateway import Gateway
+from app.models.supervisor import Supervisor
 from app.models.sensor_data import SensorData
 from app.models.user import User, UserRole
 from app.models.system_health import SystemHealthLog
@@ -19,15 +20,24 @@ router = APIRouter()
 @router.get("/summary")
 async def summary(db: AsyncSession = Depends(get_db), _=Depends(get_current_active_user)):
     total_helmets = (await db.execute(select(func.count()).select_from(Helmet))).scalar()
-    total_workers = (
+    active_workers = (
         await db.execute(select(func.count()).select_from(Worker).where(Worker.is_active == True))
+    ).scalar()
+    inactive_workers = (
+        await db.execute(select(func.count()).select_from(Worker).where(Worker.is_active == False))
+    ).scalar()
+    total_supervisors = (
+        await db.execute(select(func.count()).select_from(Supervisor).where(Supervisor.is_active == True))
     ).scalar()
     unresolved_alerts = (
         await db.execute(select(func.count()).select_from(Alert).where(Alert.is_resolved == False))
     ).scalar()
     return {
         "total_helmets": total_helmets,
-        "total_workers": total_workers,
+        "total_workers": active_workers + inactive_workers,
+        "active_workers": active_workers,
+        "inactive_workers": inactive_workers,
+        "total_supervisors": total_supervisors,
         "unresolved_alerts": unresolved_alerts,
     }
 
@@ -175,6 +185,26 @@ async def network_health(db: AsyncSession = Depends(get_db), _=Depends(get_curre
     }
 
 
+@router.get("/helmet-status")
+async def helmet_status(db: AsyncSession = Depends(get_db), _=Depends(get_current_active_user)):
+    total = (await db.execute(select(func.count()).select_from(Helmet))).scalar()
+    active = (
+        await db.execute(select(func.count()).select_from(Helmet).where(Helmet.is_active == True))
+    ).scalar()
+    assigned = (
+        await db.execute(
+            select(func.count()).select_from(Helmet).where(Helmet.worker_id.isnot(None))
+        )
+    ).scalar()
+    return {
+        "total_helmets": total,
+        "active": active,
+        "inactive": total - active,
+        "assigned": assigned,
+        "unassigned": total - assigned,
+    }
+
+
 @router.get("/active-sessions")
 async def active_sessions(db: AsyncSession = Depends(get_db), _=Depends(get_current_active_user)):
     total_supervisors = (await db.execute(
@@ -212,18 +242,18 @@ async def usage_trends(
         .group_by(func.date(Worker.created_at))
         .order_by(func.date(Worker.created_at))
     )
-    gateways_result = await db.execute(
-        select(func.date(Gateway.created_at).label("date"), func.count(Gateway.id).label("count"))
-        .where(Gateway.created_at >= since)
-        .group_by(func.date(Gateway.created_at))
-        .order_by(func.date(Gateway.created_at))
+    supervisors_result = await db.execute(
+        select(func.date(Supervisor.created_at).label("date"), func.count(Supervisor.id).label("count"))
+        .where(Supervisor.created_at >= since)
+        .group_by(func.date(Supervisor.created_at))
+        .order_by(func.date(Supervisor.created_at))
     )
 
     return {
         "days": days,
-        "helmets":  [{"date": str(r[0]), "count": r[1]} for r in helmets_result.all()],
-        "workers":  [{"date": str(r[0]), "count": r[1]} for r in workers_result.all()],
-        "gateways": [{"date": str(r[0]), "count": r[1]} for r in gateways_result.all()],
+        "helmets":     [{"date": str(r[0]), "count": r[1]} for r in helmets_result.all()],
+        "workers":     [{"date": str(r[0]), "count": r[1]} for r in workers_result.all()],
+        "supervisors": [{"date": str(r[0]), "count": r[1]} for r in supervisors_result.all()],
     }
 
 
@@ -289,3 +319,63 @@ async def peak_hours(
     )
     counts = {int(r[0]): r[1] for r in result.all()}
     return [{"hour": h, "label": f"{h:02d}:00", "alert_count": counts.get(h, 0)} for h in range(24)]
+
+
+@router.get("/quick-actions")
+async def quick_actions(
+    db: AsyncSession = Depends(get_db),
+    _=Depends(get_current_active_user),
+):
+    """Dashboard quick-action panel: unresolved alerts, unassigned helmets, inactive workers."""
+    unresolved_alerts = (
+        await db.execute(select(func.count()).select_from(Alert).where(Alert.is_resolved == False))
+    ).scalar()
+    inactive_workers = (
+        await db.execute(select(func.count()).select_from(Worker).where(Worker.is_active == False))
+    ).scalar()
+    unassigned_helmets = (
+        await db.execute(
+            select(func.count()).select_from(Helmet).where(Helmet.worker_id.is_(None))
+        )
+    ).scalar()
+    workers_without_helmets = (
+        await db.execute(
+            select(func.count()).select_from(Worker)
+            .where(
+                Worker.is_active == True,
+                ~Worker.id.in_(select(Helmet.worker_id).where(Helmet.worker_id.isnot(None)))
+            )
+        )
+    ).scalar()
+    return {
+        "actions": [
+            {
+                "key": "unresolved_alerts",
+                "label": "Unresolved Alerts",
+                "count": unresolved_alerts,
+                "severity": "critical" if unresolved_alerts > 0 else "ok",
+                "link": "/alerts?resolved=false",
+            },
+            {
+                "key": "inactive_workers",
+                "label": "Inactive Workers",
+                "count": inactive_workers,
+                "severity": "warning" if inactive_workers > 0 else "ok",
+                "link": "/workers?is_active=false",
+            },
+            {
+                "key": "unassigned_helmets",
+                "label": "Unassigned Helmets",
+                "count": unassigned_helmets,
+                "severity": "info",
+                "link": "/helmets",
+            },
+            {
+                "key": "workers_without_helmets",
+                "label": "Workers Without Helmets",
+                "count": workers_without_helmets,
+                "severity": "warning" if workers_without_helmets > 0 else "ok",
+                "link": "/workers",
+            },
+        ]
+    }

@@ -124,9 +124,7 @@ async def gateways_ws(websocket: WebSocket):
                             "location": g.location,
                             "ip_address": g.ip_address,
                             "packet_delivery_rate": g.packet_delivery_rate,
-                            "last_seen": g.last_seen.isoformat()
-                            if g.last_seen
-                            else None,
+                            "last_seen": g.last_seen.isoformat() if g.last_seen else None,
                         }
                         for g in gateways
                     ],

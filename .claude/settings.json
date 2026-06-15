@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ' *)",
+      "Bash(alembic stamp *)",
+      "Bash(alembic upgrade *)",
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(grep -Hm1 ^description: 'c:\\\\Users\\\\jeann\\\\OneDrive\\\\Desktop\\\\final-year project\\\\smart_helmet_backend/.claude/skills/*/SKILL.md')"
+    ]
+  }
+}
