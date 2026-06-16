@@ -13,6 +13,9 @@ load_dotenv()
 
 from app.db.base import Base
 from app.models import User, Gateway, Supervisor, Worker, Helmet, Alert, SensorData
+from app.models.department import Department
+from app.models.notification import Notification
+from app.models.system_health import SystemHealthLog
 from app.core.config import settings
 
 # this is the Alembic Config object, which provides
