@@ -18,3 +18,4 @@ joblib
 numpy
 tensorflow-cpu
 tf-keras
+reportlab
