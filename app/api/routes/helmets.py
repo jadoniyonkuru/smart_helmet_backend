@@ -19,6 +19,8 @@ from app.core.dependencies import get_current_active_user, require_admin
 from app.models.sensor_data import SensorData
 from app.models.alert import Alert, AlertLevel, AlertType
 from app.models.helmet import HelmetStatus
+from app.models.user import User, UserRole
+from app.models.supervisor import Supervisor
 from app.websockets.manager import manager
 
 router = APIRouter()
@@ -30,9 +32,16 @@ async def list_helmets(
     limit: int = 100,
     assigned: Optional[bool] = None,
     db: AsyncSession = Depends(get_db),
-    _=Depends(get_current_active_user),
+    current_user: User = Depends(get_current_active_user),
 ):
-    return await get_all_helmets(db, skip, limit, assigned)
+    supervisor_id = None
+    if current_user.role == UserRole.supervisor:
+        sup = (await db.execute(
+            select(Supervisor).where(Supervisor.user_id == current_user.id)
+        )).scalar_one_or_none()
+        if sup:
+            supervisor_id = sup.id
+    return await get_all_helmets(db, skip, limit, assigned, supervisor_id)
 
 
 @router.post("/", response_model=HelmetResponse, status_code=201)

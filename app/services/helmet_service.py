@@ -6,6 +6,7 @@ from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
 
 from app.models.helmet import Helmet
+from app.models.worker import Worker
 from app.schemas.helmet import HelmetCreate, HelmetUpdate
 
 
@@ -14,13 +15,21 @@ def _helmet_query():
 
 
 async def get_all_helmets(
-    db: AsyncSession, skip: int = 0, limit: int = 100, assigned: Optional[bool] = None
+    db: AsyncSession,
+    skip: int = 0,
+    limit: int = 100,
+    assigned: Optional[bool] = None,
+    supervisor_id: Optional[uuid.UUID] = None,
 ):
     q = _helmet_query()
     if assigned is True:
         q = q.where(Helmet.worker_id.isnot(None))
     elif assigned is False:
         q = q.where(Helmet.worker_id.is_(None))
+    if supervisor_id is not None:
+        q = q.join(Worker, Helmet.worker_id == Worker.id).where(
+            Worker.supervisor_id == supervisor_id
+        )
     result = await db.execute(q.offset(skip).limit(limit))
     return result.scalars().all()
 
