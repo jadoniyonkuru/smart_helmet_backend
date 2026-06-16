@@ -15,7 +15,7 @@ from app.services.helmet_service import (
     update_helmet,
     delete_helmet,
 )
-from app.core.dependencies import get_current_active_user
+from app.core.dependencies import get_current_active_user, require_admin
 from app.models.sensor_data import SensorData
 from app.models.alert import Alert, AlertLevel, AlertType
 from app.models.helmet import HelmetStatus
@@ -39,7 +39,7 @@ async def list_helmets(
 async def add_helmet(
     data: HelmetCreate,
     db: AsyncSession = Depends(get_db),
-    _=Depends(get_current_active_user),
+    _=Depends(require_admin),
 ):
     return await create_helmet(db, data)
 
@@ -67,7 +67,7 @@ async def edit_helmet(
 async def remove_helmet(
     helmet_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _=Depends(get_current_active_user),
+    _=Depends(require_admin),
 ):
     await delete_helmet(db, helmet_id)
 

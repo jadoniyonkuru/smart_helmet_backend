@@ -87,10 +87,13 @@ app.add_middleware(
         "http://127.0.0.1:3000",
         "http://localhost:3001",
         "http://127.0.0.1:3001",
-        "https://*.vercel.app",
-        "https://*.railway.app",
+        "https://smart-safety-helmet.vercel.app",
         settings.FRONTEND_URL,
     ],
+    # allow_origins only matches exact strings, so the previous
+    # "https://*.vercel.app" / "https://*.railway.app" entries never
+    # actually matched anything — use a regex to cover preview deployments.
+    allow_origin_regex=r"https://.*\.(vercel|railway)\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
