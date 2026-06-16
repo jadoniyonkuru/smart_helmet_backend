@@ -19,3 +19,4 @@ numpy
 tensorflow-cpu
 tf-keras
 reportlab
+psutil
