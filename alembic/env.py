@@ -59,7 +59,7 @@ def run_migrations_offline() -> None:
     )
     # alembic offline cannot use async driver; convert asyncpg URL to sync driver
     if url and "+asyncpg" in url:
-        url = url.replace("+asyncpg", "")
+        url = url.replace("+asyncpg", "").replace("ssl=require", "sslmode=require")
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -83,7 +83,7 @@ def run_migrations_online() -> None:
         "sqlalchemy.url"
     )
     if db_url and "+asyncpg" in db_url:
-        db_url = db_url.replace("+asyncpg", "")
+        db_url = db_url.replace("+asyncpg", "").replace("ssl=require", "sslmode=require")
 
     connectable = create_engine(db_url, poolclass=pool.NullPool)
 
