@@ -27,7 +27,7 @@ def _supervisor_query():
 
 
 def _worker_query():
-    return select(Worker).options(selectinload(Worker.user))
+    return select(Worker).options(selectinload(Worker.user), selectinload(Worker.dept))
 
 
 @router.get("/", response_model=List[SupervisorResponse])

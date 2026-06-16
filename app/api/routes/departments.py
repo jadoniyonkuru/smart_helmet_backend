@@ -113,7 +113,7 @@ async def department_workers(
 ):
     result = await db.execute(
         select(Worker)
-        .options(selectinload(Worker.user))
+        .options(selectinload(Worker.user), selectinload(Worker.dept))
         .where(Worker.department_id == dept_id)
     )
     return result.scalars().all()

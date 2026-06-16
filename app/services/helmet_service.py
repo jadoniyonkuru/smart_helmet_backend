@@ -1,4 +1,5 @@
 import uuid
+from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -12,8 +13,15 @@ def _helmet_query():
     return select(Helmet).options(selectinload(Helmet.worker))
 
 
-async def get_all_helmets(db: AsyncSession, skip: int = 0, limit: int = 100):
-    result = await db.execute(_helmet_query().offset(skip).limit(limit))
+async def get_all_helmets(
+    db: AsyncSession, skip: int = 0, limit: int = 100, assigned: Optional[bool] = None
+):
+    q = _helmet_query()
+    if assigned is True:
+        q = q.where(Helmet.worker_id.isnot(None))
+    elif assigned is False:
+        q = q.where(Helmet.worker_id.is_(None))
+    result = await db.execute(q.offset(skip).limit(limit))
     return result.scalars().all()
 
 

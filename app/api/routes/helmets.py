@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -28,10 +28,11 @@ router = APIRouter()
 async def list_helmets(
     skip: int = 0,
     limit: int = 100,
+    assigned: Optional[bool] = None,
     db: AsyncSession = Depends(get_db),
     _=Depends(get_current_active_user),
 ):
-    return await get_all_helmets(db, skip, limit)
+    return await get_all_helmets(db, skip, limit, assigned)
 
 
 @router.post("/", response_model=HelmetResponse, status_code=201)

@@ -74,6 +74,7 @@ app = FastAPI(
     title=settings.APP_NAME,
     version="1.0.0",
     lifespan=lifespan,
+    redirect_slashes=True,
 )
 
 Path("uploads/avatars").mkdir(parents=True, exist_ok=True)
@@ -83,7 +84,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
+        "http://127.0.0.1:3000",
         "http://localhost:3001",
+        "http://127.0.0.1:3001",
         "https://*.vercel.app",
         "https://*.railway.app",
         settings.FRONTEND_URL,

@@ -9,10 +9,12 @@ from sqlalchemy.orm import selectinload
 from app.db.session import get_db
 from app.schemas.worker import WorkerCreate, WorkerUpdate, WorkerResponse
 from app.schemas.helmet import HelmetResponse
-from app.core.dependencies import get_current_active_user
+from app.schemas.supervisor import SupervisorResponse
+from app.core.dependencies import get_current_active_user, require_admin
 from app.core.security import hash_password
 from app.models.worker import Worker
 from app.models.helmet import Helmet
+from app.models.alert import Alert
 from app.models.user import User, UserRole
 from app.models.supervisor import Supervisor
 from app.services.email_service import send_worker_welcome_email
@@ -23,6 +25,7 @@ router = APIRouter()
 def _worker_query():
     return select(Worker).options(
         selectinload(Worker.user),
+        selectinload(Worker.dept),
     )
 
 
@@ -62,6 +65,14 @@ async def add_worker(
         )).scalar_one_or_none()
         if sup:
             supervisor_id = sup.id
+
+    # If a supervisor_id was provided, ensure it exists
+    if supervisor_id is not None:
+        existing_sup = (await db.execute(
+            select(Supervisor).where(Supervisor.id == supervisor_id)
+        )).scalar_one_or_none()
+        if not existing_sup:
+            raise HTTPException(status_code=400, detail="Supervisor not found")
 
     user_id = data.user_id
     # Auto-create a User account when email is provided
@@ -183,6 +194,58 @@ async def remove_worker(
             raise HTTPException(status_code=403, detail="Access denied")
     await db.delete(worker)
     await db.commit()
+
+
+@router.post("/{worker_id}/promote", response_model=SupervisorResponse, status_code=201)
+async def promote_worker_to_supervisor(
+    worker_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_admin),
+):
+    result = await db.execute(_worker_query().where(Worker.id == worker_id))
+    worker = result.scalar_one_or_none()
+    if not worker:
+        raise HTTPException(status_code=404, detail="Worker not found")
+    if not worker.user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Worker has no account (email) and cannot be promoted",
+        )
+
+    existing_sup = (await db.execute(
+        select(Supervisor).where(Supervisor.user_id == worker.user_id)
+    )).scalar_one_or_none()
+    if existing_sup:
+        raise HTTPException(status_code=400, detail="This person is already a supervisor")
+
+    employee_id = f"SUP-{uuid.uuid4().hex[:8].upper()}"
+    supervisor = Supervisor(
+        full_name=worker.full_name,
+        employee_id=employee_id,
+        phone=worker.phone,
+        user_id=worker.user_id,
+    )
+    db.add(supervisor)
+
+    user = (await db.execute(select(User).where(User.id == worker.user_id))).scalar_one()
+    user.role = UserRole.supervisor
+
+    # Free up anything still pointing at the worker row before deleting it
+    await db.execute(
+        Helmet.__table__.update().where(Helmet.worker_id == worker.id).values(worker_id=None)
+    )
+    await db.execute(
+        Alert.__table__.update().where(Alert.worker_id == worker.id).values(worker_id=None)
+    )
+    await db.delete(worker)
+    await db.commit()
+
+    result = await db.execute(
+        select(Supervisor)
+        .options(selectinload(Supervisor.user), selectinload(Supervisor.workers))
+        .where(Supervisor.id == supervisor.id)
+    )
+    return result.scalar_one()
 
 
 @router.get("/{worker_id}/helmets", response_model=List[HelmetResponse])
