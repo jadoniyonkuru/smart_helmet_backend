@@ -12,6 +12,7 @@ from sqlalchemy import select
 from app.models.sensor_data import SensorData
 from app.models.helmet import Helmet, HelmetStatus
 from app.models.alert import Alert, AlertLevel, AlertType
+from app.models.notification import Notification, NotificationType
 from app.websockets.manager import manager
 
 logger = logging.getLogger(__name__)
@@ -90,6 +91,28 @@ async def process_helmet_reading(
     helmet.last_seen = datetime.utcnow()
     new_status = HelmetStatus.active
 
+    # ── Resolve supervisor user_id for notifications ──────────────────────────
+    supervisor_user_id = None
+    if helmet.worker_id:
+        from app.models.worker import Worker
+        from app.models.supervisor import Supervisor
+        _res = await db.execute(
+            select(Supervisor.user_id)
+            .join(Worker, Worker.supervisor_id == Supervisor.id)
+            .where(Worker.id == helmet.worker_id)
+        )
+        supervisor_user_id = _res.scalar_one_or_none()
+
+    def _notify(title: str, message: str, ntype: NotificationType) -> None:
+        if supervisor_user_id:
+            db.add(Notification(
+                user_id=supervisor_user_id,
+                title=title,
+                message=message,
+                type=ntype,
+                related_helmet_id=helmet_id,
+            ))
+
     # ── Threshold alerts ──────────────────────────────────────────────────────
     co = data.get("co")
     ch4 = data.get("ch4")
@@ -104,6 +127,7 @@ async def process_helmet_reading(
                 message=f"Critical CO level: {co:.1f} ppm (threshold: 200 ppm)",
                 helmet_id=helmet_id, worker_id=helmet.worker_id,
             ))
+            _notify("Critical CO Alert", f"CO level is {co:.1f} ppm — exceeds 200 ppm limit.", NotificationType.critical)
             new_status = HelmetStatus.critical
         elif co > 50:
             db.add(Alert(
@@ -111,6 +135,7 @@ async def process_helmet_reading(
                 message=f"Elevated CO level: {co:.1f} ppm (threshold: 50 ppm)",
                 helmet_id=helmet_id, worker_id=helmet.worker_id,
             ))
+            _notify("CO Warning", f"CO level is {co:.1f} ppm — exceeds 50 ppm threshold.", NotificationType.warning)
             if new_status != HelmetStatus.critical:
                 new_status = HelmetStatus.warning
 
@@ -121,6 +146,7 @@ async def process_helmet_reading(
                 message=f"Critical CH4 level: {ch4:.2f}% (threshold: 2.0%)",
                 helmet_id=helmet_id, worker_id=helmet.worker_id,
             ))
+            _notify("Critical CH4 Alert", f"CH4 level is {ch4:.2f}% — exceeds 2.0% limit.", NotificationType.critical)
             new_status = HelmetStatus.critical
         elif ch4 > 1.0:
             db.add(Alert(
@@ -128,6 +154,7 @@ async def process_helmet_reading(
                 message=f"Elevated CH4 level: {ch4:.2f}% (threshold: 1.0%)",
                 helmet_id=helmet_id, worker_id=helmet.worker_id,
             ))
+            _notify("CH4 Warning", f"CH4 level is {ch4:.2f}% — exceeds 1.0% threshold.", NotificationType.warning)
             if new_status != HelmetStatus.critical:
                 new_status = HelmetStatus.warning
 
@@ -138,6 +165,7 @@ async def process_helmet_reading(
                 message=f"Critical temperature: {temperature:.1f}°C",
                 helmet_id=helmet_id, worker_id=helmet.worker_id,
             ))
+            _notify("Critical Temperature", f"Temperature is {temperature:.1f}°C — exceeds 55°C limit.", NotificationType.critical)
             new_status = HelmetStatus.critical
         elif temperature > 40:
             db.add(Alert(
@@ -145,6 +173,7 @@ async def process_helmet_reading(
                 message=f"High temperature: {temperature:.1f}°C",
                 helmet_id=helmet_id, worker_id=helmet.worker_id,
             ))
+            _notify("High Temperature", f"Temperature is {temperature:.1f}°C — exceeds 40°C threshold.", NotificationType.warning)
             if new_status != HelmetStatus.critical:
                 new_status = HelmetStatus.warning
 
@@ -154,6 +183,7 @@ async def process_helmet_reading(
             message="Impact/fall detected",
             helmet_id=helmet_id, worker_id=helmet.worker_id,
         ))
+        _notify("Impact Detected", "A fall or impact event was detected on a worker's helmet.", NotificationType.critical)
         new_status = HelmetStatus.critical
 
     if helmet_wear is False:
@@ -162,6 +192,7 @@ async def process_helmet_reading(
             message="Helmet not being worn",
             helmet_id=helmet_id, worker_id=helmet.worker_id,
         ))
+        _notify("Helmet Not Worn", "A worker is not wearing their helmet.", NotificationType.warning)
         if new_status != HelmetStatus.critical:
             new_status = HelmetStatus.warning
 
@@ -183,6 +214,8 @@ async def process_helmet_reading(
             helmet_id=helmet_id, worker_id=helmet.worker_id,
         )
         db.add(ai_alert)
+        ntype = NotificationType.critical if level == AlertLevel.critical else NotificationType.warning
+        _notify("AI Danger Detected", f"AI flagged danger ({dv}/4 models, {reading.ai_confidence or 0:.1f}% confidence).", ntype)
         if level == AlertLevel.critical:
             helmet.status = HelmetStatus.critical
 
