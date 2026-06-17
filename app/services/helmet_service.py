@@ -26,7 +26,7 @@ async def get_all_helmets(
         q = q.where(Helmet.worker_id.isnot(None))
     elif assigned is False:
         q = q.where(Helmet.worker_id.is_(None))
-    if supervisor_id is not None:
+    if supervisor_id is not None and assigned is not False:
         q = q.join(Worker, Helmet.worker_id == Worker.id).where(
             Worker.supervisor_id == supervisor_id
         )
