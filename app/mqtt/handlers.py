@@ -34,11 +34,11 @@ def _transform(fw: dict) -> dict:
     return {
         "co":             fw.get("co_ppm", 0),
         "ch4":            fw.get("ch4_pct", 0),
-        "gasLevel":       fw.get("co_ppm", 0),
+        "gasLevel":       int(fw.get("co_ppm", 0)),
         "temperature":    fw.get("temperature_c", 0),
         "humidity":       fw.get("humidity_pct", 0),
         "helmetWear":     fw.get("helmet_worn", True),
-        "impactDetected": fw.get("alert_fall", False),
+        "impactDetected": fw.get("vibration", False),
         "battery":        100.0,
         "signalStrength": fw.get("rssi", -50),
         "accelerometerX": fw.get("accel_x", 0),
@@ -72,6 +72,12 @@ async def on_helmet_reading(topic: str, payload: dict) -> None:
             helmet_num,
         )
         return
+
+    vibration_value = payload.get("vibration", False)
+    logger.info(
+        "[DEBUG] Received vibration=%s, mapping to impactDetected=%s",
+        vibration_value, vibration_value,
+    )
 
     backend_data = _transform(payload)
 
