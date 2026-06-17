@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 import logging
 from pathlib import Path
@@ -55,10 +56,10 @@ async def _seed_admin() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await _seed_admin()
-    # Try to import AI service lazily and report status; allow startup without ML deps.
+
+    # AI models
     try:
         from app.services.ai_service import ai_service
-
         if getattr(ai_service, "models_loaded", False):
             logger.info("[STARTUP] AI models loaded — inference active")
         else:
@@ -67,7 +68,23 @@ async def lifespan(app: FastAPI):
         logger.warning(
             "[STARTUP] AI service unavailable (ML dependencies may be missing)"
         )
+
+    # MQTT — subscribe to helmet readings and start broker connection
+    from app.services.mqtt_service import mqtt_service
+    from app.mqtt.handlers import on_helmet_reading
+    try:
+        mqtt_service.subscribe("helmets/+/readings", on_helmet_reading)
+        mqtt_service.start(asyncio.get_running_loop())
+    except Exception as exc:
+        logger.error("[STARTUP] MQTT service failed to start: %s", exc)
+
     yield
+
+    # Shutdown MQTT cleanly
+    try:
+        mqtt_service.stop()
+    except Exception:
+        pass
 
 
 app = FastAPI(
