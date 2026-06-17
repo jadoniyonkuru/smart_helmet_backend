@@ -63,7 +63,9 @@ async def lifespan(app: FastAPI):
         if getattr(ai_service, "models_loaded", False):
             logger.info("[STARTUP] AI models loaded — inference active")
         else:
-            logger.warning("[STARTUP] AI models NOT loaded — inference disabled")
+            logger.warning(
+                "[STARTUP] AI models NOT loaded — inference disabled"
+            )
     except Exception:
         logger.warning(
             "[STARTUP] AI service unavailable (ML dependencies may be missing)"
@@ -73,7 +75,7 @@ async def lifespan(app: FastAPI):
     from app.services.mqtt_service import mqtt_service
     from app.mqtt.handlers import on_helmet_reading
     try:
-        mqtt_service.subscribe("helmets/+/readings", on_helmet_reading)
+        mqtt_service.subscribe("safehelm/helmets/+/readings", on_helmet_reading)
         mqtt_service.start(asyncio.get_running_loop())
     except Exception as exc:
         logger.error("[STARTUP] MQTT service failed to start: %s", exc)
@@ -138,7 +140,9 @@ app.include_router(
     prefix="/api/v1/notifications",
     tags=["notifications"],
 )
-app.include_router(departments.router, prefix="/api/v1/departments", tags=["departments"])
+app.include_router(
+    departments.router, prefix="/api/v1/departments", tags=["departments"]
+)
 
 
 @app.get("/", tags=["root"])
