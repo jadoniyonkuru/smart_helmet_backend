@@ -78,7 +78,8 @@ async def process_helmet_reading(
     else:
         ai_result = {"prediction": "unknown", "danger_votes": 0, "confidence": 0, "model_votes": {}}
 
-    reading.ai_prediction = ai_result.get("prediction")
+    raw_ai_prediction = ai_result.get("prediction")
+    reading.ai_prediction = raw_ai_prediction
     reading.ai_confidence = ai_result.get("confidence")
     reading.ai_danger_votes = ai_result.get("danger_votes")
     mvotes = ai_result.get("model_votes", {})
@@ -198,8 +199,21 @@ async def process_helmet_reading(
 
     helmet.status = new_status
 
+    # ── Overall AI Prediction ──────────────────────────────────────────────────
+    # The trained ensemble only sees gas/temperature/humidity, so it can never flag
+    # danger from vibration or a removed helmet on its own. Fold those direct safety
+    # signals into the displayed verdict so "AI Prediction" reflects real risk.
+    reading.ai_prediction = "danger" if (
+        raw_ai_prediction == "danger"
+        or impact is True
+        or helmet_wear is False
+        or new_status == HelmetStatus.critical
+    ) else "safe"
+
     # ── AI danger alert ───────────────────────────────────────────────────────
-    if reading.ai_prediction == "danger":
+    # Keyed on the raw ensemble verdict only, so vibration/helmet-off events (which
+    # already raise their own alert+notification above) don't get a duplicate one.
+    if raw_ai_prediction == "danger":
         dv = int(reading.ai_danger_votes or 0)
         level = AlertLevel.critical if dv >= 3 else AlertLevel.warning
         votes_str = " ".join([
